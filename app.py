@@ -1,3 +1,4 @@
+# -------- app.py --------
 import streamlit as st
 import fitz  # PyMuPDF
 import easyocr
@@ -6,24 +7,31 @@ import numpy as np
 import json
 import os
 
-# Create output folder
+# 📁 Output folder
 os.makedirs("output", exist_ok=True)
 
 st.set_page_config(layout="wide")
 st.title("📄 Word-Level Coordinate Highlighter (EasyOCR + PyMuPDF)")
 
+# 📤 File uploader
+uploaded_file = st.file_uploader("Upload a PDF file", type="pdf")
+
+# 🧠 EasyOCR reader (cached safely)
 @st.cache_resource
 def get_reader():
     return easyocr.Reader(['en'], gpu=False, verbose=False, quantize=True)
 
+# ✅ Load PDF bytes only (not fitz.Document)
 @st.cache_data
-def load_pdf(pdf_bytes):
-    return fitz.open(stream=pdf_bytes, filetype="pdf")
+def load_pdf_bytes(file):
+    return file.read()
 
+# 💾 Save output to JSON file
 def save_json(data, path):
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
 
+# 🧪 OCR Process and coordinate extraction
 def process_pdf(doc, max_pages, reader):
     layout_json = {}
     word_json = {}
@@ -72,6 +80,7 @@ def process_pdf(doc, max_pages, reader):
 
     return layout_json, word_json
 
+# 🔦 Draw highlights for matching keywords
 def render_with_highlights(pages, word_json, queries):
     for i, page in enumerate(pages):
         if str(i) not in word_json:
@@ -89,9 +98,7 @@ def render_with_highlights(pages, word_json, queries):
 
         st.image(img, caption=f"Page {i+1}", width=800)
 
-# ----------------- Streamlit UI Flow --------------------
-uploaded_file = st.file_uploader("📤 Upload a PDF", type=["pdf"])
-
+# ----------------- Streamlit Flow --------------------
 if uploaded_file:
     with st.form("pdf_form"):
         max_pages = st.number_input("📄 Number of pages to process", min_value=1, value=5)
@@ -100,12 +107,12 @@ if uploaded_file:
     if submitted:
         with st.spinner("⚙️ Processing... please wait..."):
             reader = get_reader()
-            pdf_bytes = uploaded_file.getvalue()  # ✅ CORRECT FIX HERE
-            doc = load_pdf(pdf_bytes)
+            pdf_bytes = load_pdf_bytes(uploaded_file)
+            doc = fitz.open(stream=pdf_bytes, filetype="pdf")  # ⚠️ Not cached
             layout_json, word_json = process_pdf(doc, max_pages, reader)
             save_json(layout_json, "output/layout.json")
             save_json(word_json, "output/wordjson.json")
-        st.success("✅ Processing complete! JSON files saved.")
+        st.success("✅ Processing complete! JSON files saved to `output/` folder.")
 
         st.markdown("### 🔍 Search up to 5 Keywords")
         queries = []
