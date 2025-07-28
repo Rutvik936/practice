@@ -6,7 +6,7 @@ import numpy as np
 import json
 import os
 
-# Output folder
+# Create output folder
 os.makedirs("output", exist_ok=True)
 
 st.set_page_config(layout="wide")
@@ -100,7 +100,8 @@ if uploaded_file:
     if submitted:
         with st.spinner("⚙️ Processing... please wait..."):
             reader = get_reader()
-            doc = load_pdf(uploaded_file.read())
+            pdf_bytes = uploaded_file.getvalue()  # ✅ FIXED here
+            doc = load_pdf(pdf_bytes)
             layout_json, word_json = process_pdf(doc, max_pages, reader)
             save_json(layout_json, "output/layout.json")
             save_json(word_json, "output/wordjson.json")
