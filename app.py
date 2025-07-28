@@ -1,3 +1,4 @@
+# -------- app.py --------
 import streamlit as st
 import fitz  # PyMuPDF
 import easyocr
@@ -10,18 +11,21 @@ import os
 os.makedirs("output", exist_ok=True)
 
 st.set_page_config(layout="wide")
-st.title("📄 Word-Level Coordinate Highlighter (EasyOCR + PyMuPDF)")
+st.title("\ud83d\udcc4 Word-Level Coordinate Highlighter (EasyOCR + PyMuPDF)")
 
-uploaded_file = st.file_uploader("📤 Upload a PDF", type=["pdf"])
+@st.cache_resource
+def get_reader():
+    return easyocr.Reader(['en'], gpu=False, verbose=False, quantize=True)
+
+@st.cache_data
+def load_pdf(pdf_bytes):
+    return fitz.open(stream=pdf_bytes, filetype="pdf")
 
 def save_json(data, path):
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
 
-def process_pdf(pdf_data, max_pages):
-    doc = fitz.open(stream=pdf_data.read(), filetype="pdf")
-    reader = easyocr.Reader(['en'], gpu=False, verbose=False, quantize=True)
-
+def process_pdf(doc, max_pages, reader):
     layout_json = {}
     word_json = {}
 
@@ -46,7 +50,7 @@ def process_pdf(pdf_data, max_pages):
         word_json[str(i)] = []
 
         for (bbox, text, conf) in results:
-            if text.strip() == "":
+            if text.strip() == "" or conf < 0.4:
                 continue
 
             x_min = int(min(pt[0] for pt in bbox))
@@ -67,7 +71,7 @@ def process_pdf(pdf_data, max_pages):
             "text": all_text
         })
 
-    return layout_json, word_json, doc
+    return layout_json, word_json
 
 def render_with_highlights(pages, word_json, queries):
     for i, page in enumerate(pages):
@@ -88,26 +92,31 @@ def render_with_highlights(pages, word_json, queries):
 
 # ----------------- Streamlit UI Flow --------------------
 if uploaded_file:
-    max_pages = st.number_input("📄 Number of pages to process", min_value=1, value=5)
+    with st.form("pdf_form"):
+        max_pages = st.number_input("\ud83d\udcc4 Number of pages to process", min_value=1, value=5)
+        submitted = st.form_submit_button("Process PDF")
 
-    with st.spinner("⚙️ Processing... please wait..."):
-        layout_json, word_json, doc = process_pdf(uploaded_file, max_pages)
-        save_json(layout_json, "output/layout.json")
-        save_json(word_json, "output/wordjson.json")
-    st.success("✅ Processing complete! JSON files saved.")
+    if submitted:
+        with st.spinner("\u2699\ufe0f Processing... please wait..."):
+            reader = get_reader()
+            doc = load_pdf(uploaded_file.read())
+            layout_json, word_json = process_pdf(doc, max_pages, reader)
+            save_json(layout_json, "output/layout.json")
+            save_json(word_json, "output/wordjson.json")
+        st.success("\u2705 Processing complete! JSON files saved.")
 
-    st.markdown("### 🔍 Search up to 5 Keywords")
-    queries = []
-    for i in range(5):
-        word = st.text_input(f"Keyword {i+1}", key=f"query_{i}")
-        if word:
-            queries.append(word)
+        st.markdown("### \ud83d\udd0d Search up to 5 Keywords")
+        queries = []
+        for i in range(5):
+            word = st.text_input(f"Keyword {i+1}", key=f"query_{i}")
+            if word:
+                queries.append(word)
 
-    st.markdown("---")
-    if queries:
-        st.markdown("### 🔦 Highlighted Results")
-        render_with_highlights(doc, word_json, queries)
-    else:
-        pix = doc[0].get_pixmap(matrix=fitz.Matrix(1, 1))
-        img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
-        st.image(img, caption="Page 1", width=800)
+        st.markdown("---")
+        if queries:
+            st.markdown("### \ud83d\udd26 Highlighted Results")
+            render_with_highlights(doc, word_json, queries)
+        else:
+            pix = doc[0].get_pixmap(matrix=fitz.Matrix(1, 1))
+            img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+            st.image(img, caption="Page 1", width=800)
