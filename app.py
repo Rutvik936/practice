@@ -100,7 +100,7 @@ if uploaded_file:
     if submitted:
         with st.spinner("⚙️ Processing... please wait..."):
             reader = get_reader()
-            pdf_bytes = uploaded_file.getvalue()  # ✅ FIXED here
+            pdf_bytes = uploaded_file.getvalue()  # ✅ CORRECT FIX HERE
             doc = load_pdf(pdf_bytes)
             layout_json, word_json = process_pdf(doc, max_pages, reader)
             save_json(layout_json, "output/layout.json")
