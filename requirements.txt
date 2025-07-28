@@ -1,0 +1,5 @@
+streamlit
+pillow
+PyMuPDF==1.22.3
+easyocr
+numpy
